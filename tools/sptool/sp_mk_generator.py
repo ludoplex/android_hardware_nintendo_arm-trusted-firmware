@@ -45,6 +45,7 @@ A typical SP_LAYOUT_FILE file will look like
 
 """
 
+
 import getopt
 import json
 import os
@@ -58,10 +59,10 @@ json_file = os.path.abspath(sys.argv[2])
 json_dir = os.path.dirname(json_file)
 gen_file = os.path.abspath(sys.argv[1])
 out_dir = os.path.abspath(sys.argv[3])
-dtb_dir = out_dir + "/fdts/"
+dtb_dir = f"{out_dir}/fdts/"
 MAX_SP = 8
 dualroot = sys.argv[4].lower() == "dualroot"
-split = int(MAX_SP / 2)
+split = MAX_SP // 2
 print(dtb_dir)
 platform_count = 1
 sip_count = 1
@@ -97,13 +98,13 @@ with open(gen_file, 'w') as out_file:
         """
         dts = os.path.join(json_dir, data[key]['pm'])
         dtb = dtb_dir + os.path.basename(data[key]['pm'][:-1] + "b")
-        out_file.write("FDT_SOURCES += " + dts + "\n")
+        out_file.write(f"FDT_SOURCES += {dts}" + "\n")
 
         """
         Update SPTOOL_ARGS
         """
-        dst = out_dir + "/" + key + ".pkg"
-        src = [ json_dir + "/" + data[key]['image'] , dtb  ]
+        dst = f"{out_dir}/{key}.pkg"
+        src = [f"{json_dir}/" + data[key]['image'], dtb]
         out_file.write("SPTOOL_ARGS += -i " + ":".join(src) + " -o " + dst + "\n")
 
         """
@@ -139,11 +140,11 @@ with open(gen_file, 'w') as out_file:
         """
         Append FIP_ARGS
         """
-        out_file.write("FIP_ARGS += --blob uuid=" + str(uuid_std) + ",file=" + dst + "\n")
+        out_file.write(f"FIP_ARGS += --blob uuid={str(uuid_std)},file={dst}" + "\n")
 
         """
         Append CRT_ARGS
         """
 
-        out_file.write("CRT_ARGS += --sp-pkg" + str(pkg_num) + " " + dst + "\n")
+        out_file.write(f"CRT_ARGS += --sp-pkg{str(pkg_num)} {dst}" + "\n")
         out_file.write("\n")

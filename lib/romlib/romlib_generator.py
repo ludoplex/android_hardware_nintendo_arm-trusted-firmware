@@ -39,7 +39,7 @@ class IndexFileParser:
         if parent in self.dependencies:
             direct_deps = self.dependencies[parent]
             deps = direct_deps
-            for direct_dep in direct_deps:
+            for direct_dep in deps:
                 deps += self.get_dependencies(direct_dep)
             return deps
 
@@ -49,14 +49,13 @@ class IndexFileParser:
         """ Opens and parses index file. """
         file_name = os.path.normpath(file_name)
 
-        if file_name not in self.include_chain:
-            self.include_chain.append(file_name)
-            self.dependencies[file_name] = []
-        else:
-            raise Exception("Circular dependency detected: " + file_name)
+        if file_name in self.include_chain:
+            raise Exception(f"Circular dependency detected: {file_name}")
 
+        self.include_chain.append(file_name)
+        self.dependencies[file_name] = []
         with open(file_name, "r") as index_file:
-            for line in index_file.readlines():
+            for line in index_file:
                 line_elements = line.split()
 
                 if line.startswith("#") or not line_elements:
@@ -75,12 +74,12 @@ class IndexFileParser:
                     # Library function
                     library_name = line_elements[0]
                     function_name = line_elements[1]
-                    patch = bool(len(line_elements) > 2 and line_elements[2] == "patch")
+                    patch = len(line_elements) > 2 and line_elements[2] == "patch"
 
                     self.items.append({"type": "function", "library_name": library_name,
                                        "function_name": function_name, "patch": patch})
                 else:
-                    raise Exception("Invalid line: '" + line + "'")
+                    raise Exception(f"Invalid line: '{line}'")
 
         self.include_chain.pop()
 
@@ -107,11 +106,14 @@ class RomlibApplication:
                 # Removing copyright comment to make the generated code more readable when the
                 # template is inserted multiple times into the output.
                 template_lines = template_file.readlines()
-                end_of_comment_line = 0
-                for index, line in enumerate(template_lines):
-                    if line.find("*/") != -1:
-                        end_of_comment_line = index
-                        break
+                end_of_comment_line = next(
+                    (
+                        index
+                        for index, line in enumerate(template_lines)
+                        if line.find("*/") != -1
+                    ),
+                    0,
+                )
                 template_data = "".join(template_lines[end_of_comment_line + 1:])
             else:
                 template_data = template_file.read()
@@ -151,7 +153,7 @@ class IndexPreprocessor(RomlibApplication):
         if self.config.deps:
             with open(self.config.deps, "w") as deps_file:
                 deps = [self.config.file] + index_file_parser.get_dependencies(self.config.file)
-                deps_file.write(self.config.output + ": " + " \\\n".join(deps) + "\n")
+                deps_file.write(f"{self.config.output}: " + " \\\n".join(deps) + "\n")
 
 class TableGenerator(RomlibApplication):
     """ Generates the jump table by parsing the index file. """
@@ -214,7 +216,7 @@ class WrapperGenerator(RomlibApplication):
             if item["type"] == "reserved" or item["patch"]:
                 continue
 
-            asm = self.config.b + "/" + item["function_name"] + ".s"
+            asm = f"{self.config.b}/" + item["function_name"] + ".s"
             if self.config.list:
                 # Only listing files
                 files.append(asm)
@@ -225,7 +227,7 @@ class WrapperGenerator(RomlibApplication):
                     function_offset = item_index * (8 if self.config.bti else 4)
 
                     item["function_offset"] = function_offset
-                    asm_file.write(self.build_template("wrapper" + bti + ".S", item))
+                    asm_file.write(self.build_template(f"wrapper{bti}.S", item))
 
         if self.config.list:
             print(" ".join(files))
@@ -249,7 +251,7 @@ class VariableGenerator(RomlibApplication):
 
         matching_symbol = re.search("([0-9A-Fa-f]+) . \\.text", str(symbols))
         if not matching_symbol:
-            raise Exception("No '.text' section was found in %s" % self.config.file)
+            raise Exception(f"No '.text' section was found in {self.config.file}")
 
         mapping = {"jmptbl_address": matching_symbol.group(1)}
 
@@ -261,10 +263,13 @@ if __name__ == "__main__":
             "gentbl": TableGenerator, "genwrappers": WrapperGenerator}
 
     if len(sys.argv) < 2 or sys.argv[1] not in APPS:
-        print("usage: romlib_generator.py [%s] [args]" % "|".join(APPS.keys()), file=sys.stderr)
+        print(
+            f'usage: romlib_generator.py [{"|".join(APPS.keys())}] [args]',
+            file=sys.stderr,
+        )
         sys.exit(1)
 
-    APP = APPS[sys.argv[1]]("romlib_generator.py " + sys.argv[1])
+    APP = APPS[sys.argv[1]](f"romlib_generator.py {sys.argv[1]}")
     APP.parse_arguments(sys.argv[2:])
     try:
         APP.main()

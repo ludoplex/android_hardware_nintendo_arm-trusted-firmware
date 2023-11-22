@@ -42,7 +42,7 @@ else:
 
 # Extract all the required symbols from the map files
 for image in bl_images:
-    file_path = os.path.join(build_dir, image, '{}.map'.format(image))
+    file_path = os.path.join(build_dir, image, f'{image}.map')
     if os.path.isfile(file_path):
         with open (file_path, 'rt') as mapfile:
             for line in mapfile:
@@ -53,8 +53,8 @@ for image in bl_images:
                     if match:
                         # Extract address from line
                         match = address_pattern.search(line)
-                        if match:
-                            address_list.append([match.group(0), symbol, image])
+                    if match:
+                        address_list.append([match.group(0), symbol, image])
 
 # Sort by address
 address_list.sort(key=operator.itemgetter(0))
@@ -64,16 +64,13 @@ if inverted_print:
     address_list = reversed(address_list)
 
 # Generate memory view
-print('{:-^93}'.format('Memory Map from: ' + build_dir))
+print('{:-^93}'.format(f'Memory Map from: {build_dir}'))
 for address in address_list:
     if "bl1" in address[2]:
         print(address[0], '+{:-^22}+ |{:^22}| |{:^22}|'.format(address[1], '', ''))
     elif "bl2" in address[2]:
         print(address[0], '|{:^22}| +{:-^22}+ |{:^22}|'.format('', address[1], ''))
-    elif "bl31" in address[2]:
-        print(address[0], '|{:^22}| |{:^22}| +{:-^22}+'.format('', '', address[1]))
     else:
         print(address[0], '|{:^22}| |{:^22}| +{:-^22}+'.format('', '', address[1]))
-
 print('{:^20}{:_^22}   {:_^22}   {:_^22}'.format('', '', '', ''))
 print('{:^20}{:^22}   {:^22}   {:^22}'.format('address', 'bl1', 'bl2', 'bl31'))
